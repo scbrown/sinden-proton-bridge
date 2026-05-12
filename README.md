@@ -154,7 +154,7 @@ Games that **don't** need this project at all (the Sinden already works as a nor
 - **BepInEx** by the [BepInEx team](https://github.com/BepInEx/BepInEx) — universal Unity modding framework that gracefully handles the Mono runtime inside Wine.
 - **Sinden Lightgun** — hardware and Windows software by [Sinden Technology](https://www.sindenlightgun.com). The Linux daemon shipped by Sinden is what does the camera-based aim tracking; this project orchestrates around it.
 
-This repo redistributes none of the above. You need a legitimate Sinden software download (free with hardware purchase) and your own copy of any games you want to play. We don't pirate ROMs and we don't bundle copyrighted assets.
+This repo redistributes none of the above. You need a legitimate Sinden software download (free with hardware purchase) and your own copy of any games you want to play.
 
 ## License
 
