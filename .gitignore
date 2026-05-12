@@ -1,6 +1,33 @@
-
-# Beads / Dolt files (added by bd init)
+# Beads / Dolt files
 .dolt/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Local-only operational artifacts
+/tmp/
+node_modules/
+
+# Third-party redistributable assets we do NOT own:
+# Sinden's official Linux Lightgun software (download from sindenlightgun.com),
+# Microsoft's Xbox Wireless Adapter firmware, RetroArch border PNGs, etc.
+downloads/
+linux/
+borders/
+run
+
+# DemulShooter C# source pulled locally for reference; original at
+# https://github.com/argonlefou/DemulShooter
+src/
+
+# Compiled artifacts
+*.dll
+*.cab
+*.bin
+*.exe
+
+# Editor/IDE noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
