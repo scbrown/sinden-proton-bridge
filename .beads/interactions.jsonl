@@ -6,3 +6,6 @@
 {"id":"int-69c26a7a","kind":"field_change","created_at":"2026-05-12T03:05:36.997843817Z","actor":"Steve Brown","issue_id":"sinden-5o3","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
 {"id":"int-c7c09c50","kind":"field_change","created_at":"2026-05-12T03:13:19.347009421Z","actor":"Steve Brown","issue_id":"sinden-7oc","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
 {"id":"int-e5439cf9","kind":"field_change","created_at":"2026-05-12T03:13:19.999058214Z","actor":"Steve Brown","issue_id":"sinden-x0n","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}
+{"id":"int-1fa6ce46","kind":"field_change","created_at":"2026-05-12T23:19:43.631022462Z","actor":"Steve Brown","issue_id":"sinden-x0n","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-0dc3d04d","kind":"field_change","created_at":"2026-05-12T23:19:44.393186672Z","actor":"Steve Brown","issue_id":"sinden-5o3","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-c22de18f","kind":"field_change","created_at":"2026-05-12T23:37:52.537824606Z","actor":"Steve Brown","issue_id":"sinden-brg","extra":{"field":"status","new_value":"in_progress","old_value":"open"}}

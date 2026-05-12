@@ -21,11 +21,20 @@ Defaults assume:
     - daemon's coord space = full desktop, so the OWR window covers only
       a sub-range of (0..32767) on each axis
 """
-import argparse, socket, struct, threading, time, sys, math
+import argparse, select, socket, struct, threading, time, sys, math
 from evdev import InputDevice, ecodes
 
 PORT = 33610
 ABS_MAX = 32767
+
+# Outputs (plugin → host) frame layout. Envelope is 4-byte LE length +
+# 1-byte header (=2 for Outputs), then the payload. Payload fields are
+# serialized in alphabetical order by name (same reflection rule as inputs).
+# For OWR (2 players): Ammo(int[2]) + Damaged(byte[2]) + IsPlaying(byte[2]) +
+# Life(byte[2]) + Recoil(byte[2]) = 16 bytes.
+OUTPUT_HEADER_INPUTS  = 1
+OUTPUT_HEADER_OUTPUTS = 2
+OUTPUT_PAYLOAD_LEN = 16  # 2 players
 
 class GunState:
     __slots__ = ("x", "y", "trigger", "reload", "weapon", "last_event_ts")
@@ -36,6 +45,49 @@ class GunState:
         self.reload  = 0
         self.weapon  = 0
         self.last_event_ts = 0.0
+
+class GameOutputs:
+    """Game-state events sent BACK from the BepInEx plugin."""
+    __slots__ = ("ammo", "damaged", "is_playing", "life", "recoil", "last_ts")
+    def __init__(self, players=2):
+        self.ammo       = [0] * players
+        self.damaged    = [0] * players  # one-frame pulse on damage
+        self.is_playing = [0] * players
+        self.life       = [0] * players
+        self.recoil     = [0] * players  # one-frame pulse on weapon fire
+        self.last_ts    = 0.0
+
+def parse_output_frames(buf, outputs):
+    """
+    Consume as many complete output frames from `buf` as possible, mutate
+    `outputs` for each one parsed, and return whatever bytes are left over
+    (a partial frame at the tail of buf).
+    """
+    while len(buf) >= 5:
+        # Length field counts the header byte (length = payload_len + 1).
+        length = struct.unpack_from("<i", buf, 0)[0]
+        if length < 1 or length > 4096:
+            # Stream desync — bail and reset; the next frame might be unrecoverable.
+            return b""
+        if len(buf) < 4 + length:
+            break  # incomplete frame, wait for more bytes
+        header = buf[4]
+        payload = buf[5:4 + length]
+        if header == OUTPUT_HEADER_OUTPUTS and len(payload) == OUTPUT_PAYLOAD_LEN:
+            # Alphabetical: Ammo[2] (int32), Damaged[2], IsPlaying[2], Life[2], Recoil[2]
+            ammo       = list(struct.unpack_from("<2i", payload, 0))
+            damaged    = list(struct.unpack_from("<2B", payload, 8))
+            is_playing = list(struct.unpack_from("<2B", payload, 10))
+            life       = list(struct.unpack_from("<2B", payload, 12))
+            recoil     = list(struct.unpack_from("<2B", payload, 14))
+            outputs.ammo       = ammo
+            outputs.damaged    = damaged
+            outputs.is_playing = is_playing
+            outputs.life       = life
+            outputs.recoil     = recoil
+            outputs.last_ts    = time.time()
+        buf = buf[4 + length:]
+    return buf
 
 def make_payload(x1, y1, trig1, reload1, weapon1,
                  x2=0.0, y2=0.0, trig2=0, reload2=0, weapon2=0,
@@ -94,7 +146,7 @@ def map_to_window(gun_x, gun_y, args):
     win_y = max(0.0, min(args.window_h, win_y))
     return win_x, win_y
 
-def sender(state1, state2, args, stop_evt):
+def sender(state1, state2, outputs, args, stop_evt):
     s = socket.socket()
     while not stop_evt.is_set():
         try:
@@ -113,6 +165,13 @@ def sender(state1, state2, args, stop_evt):
     reject_count = 0
     reject_streak1 = 0
     reject_streak2 = 0
+    # Output stream parsing state
+    recv_buf = b""
+    # Track per-player edges so we log a one-line event on each fire/damage.
+    last_recoil  = [0, 0]
+    last_damaged = [0, 0]
+    last_life    = list(outputs.life)
+    last_ammo    = list(outputs.ammo)
 
     while not stop_evt.is_set():
         wx1, wy1 = map_to_window(state1.x, state1.y, args)
@@ -158,11 +217,39 @@ def sender(state1, state2, args, stop_evt):
             try: s.close()
             except: pass
             s = socket.socket()
+            recv_buf = b""
             while not stop_evt.is_set():
                 try:
                     s.connect(("127.0.0.1", PORT)); break
                 except OSError:
                     time.sleep(2)
+
+        # Non-blocking peek for output frames coming back on the same socket.
+        try:
+            readable, _, _ = select.select([s], [], [], 0)
+            if readable:
+                chunk = s.recv(4096)
+                if chunk:
+                    recv_buf += chunk
+                    recv_buf = parse_output_frames(recv_buf, outputs)
+        except OSError:
+            pass
+
+        # Log game-event edges (one line per Recoil↑ / Damaged↑ / Life change /
+        # Ammo change). Cheap, only fires when something actually happened.
+        for i in (0, 1):
+            if outputs.recoil[i] and not last_recoil[i]:
+                print(f"[game] P{i+1} RECOIL fired", file=sys.stderr)
+            if outputs.damaged[i] and not last_damaged[i]:
+                print(f"[game] P{i+1} DAMAGED hp={outputs.life[i]}", file=sys.stderr)
+            if outputs.life[i] != last_life[i]:
+                print(f"[game] P{i+1} life {last_life[i]} → {outputs.life[i]}", file=sys.stderr)
+            if outputs.ammo[i] != last_ammo[i]:
+                print(f"[game] P{i+1} ammo {last_ammo[i]} → {outputs.ammo[i]}", file=sys.stderr)
+        last_recoil  = list(outputs.recoil)
+        last_damaged = list(outputs.damaged)
+        last_life    = list(outputs.life)
+        last_ammo    = list(outputs.ammo)
 
         now = time.time()
         if args.debug and now - last_log > 1.0:
@@ -225,6 +312,7 @@ def main():
 
     state1 = GunState()
     state2 = GunState() if args.gun2 != "none" else None
+    outputs = GameOutputs(players=2)
     stop = threading.Event()
     grab = not args.no_grab
 
@@ -238,7 +326,7 @@ def main():
                               daemon=True)
         t2.start()
     try:
-        sender(state1, state2, args, stop)
+        sender(state1, state2, outputs, args, stop)
     except KeyboardInterrupt:
         stop.set()
 
