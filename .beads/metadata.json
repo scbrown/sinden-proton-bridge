@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "sinden",
+  "project_id": "48e2d9e0-2ecc-4df8-8a96-6a586085af6c"
+}
