@@ -31,3 +31,7 @@ src/
 .idea/
 *.swp
 .DS_Store
+
+# Reverse-engineering scratch dir — local only, contains decompiled Sinden code
+reverse/
+
