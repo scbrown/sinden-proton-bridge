@@ -1,0 +1,41 @@
+# Sinden Lightgun → OWR plugin bridge — user service.
+#
+# Runs as the desktop user (NOT root). Needs the user to be in `plugdev`
+# (or whatever group owns /dev/input/event24,event26 per the udev rule
+# at /etc/udev/rules.d/99-sinden.rules in this repo).
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/sinden-bridge.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now sinden-bridge.service
+#
+# Status / logs:
+#   systemctl --user status sinden-bridge.service
+#   journalctl --user -u sinden-bridge.service -f
+#
+# The bridge connects on-demand to the BepInEx plugin's TCP listener
+# (127.0.0.1:33610). It can run continuously: when OWR is closed, it
+# just polls for the plugin to come back.
+
+[Unit]
+Description=Sinden Lightgun TCP bridge to OWR BepInEx plugin
+Documentation=https://github.com/scbrown/sinden-proton-bridge
+After=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/sinden
+ExecStart=/usr/bin/python3 -u %h/workspace/sinden/owr-bridge.py \
+    --x-min 0 --x-max 32767 \
+    --y-min 0 --y-max 32767 \
+    --smooth 0.5 --max-jump 0 \
+    --debug
+Restart=on-failure
+RestartSec=5
+# Bridge is lightweight (~60Hz socket send, evdev reads) but bump priority
+# so input events don't get queued behind background CPU work.
+Nice=-5
+
+[Install]
+WantedBy=default.target

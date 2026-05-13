@@ -1,0 +1,32 @@
+# Sinden Mono daemon (LightgunMono.exe) — system service.
+#
+# Runs as root because the daemon needs to write to /dev/uinput, talk to
+# multiple /dev/ttyACM* serial ports concurrently, and access /dev/video*
+# cameras without depending on the desktop session.
+#
+# Install:
+#   sudo cp systemd/sinden-mono.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now sinden-mono.service
+#
+# Status / logs:
+#   systemctl status sinden-mono.service
+#   journalctl -u sinden-mono.service -f
+
+[Unit]
+Description=Sinden Lightgun Mono daemon (camera-based aim tracker)
+Documentation=https://github.com/scbrown/sinden-proton-bridge
+After=multi-user.target
+# udev needs to have settled so /dev/ttyACM* / /dev/video* exist before we start
+After=systemd-udev-settle.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sinden-launcher
+Restart=on-failure
+RestartSec=3
+# The daemon eats ~66fps OpenCV; nice it a bit so it doesn't fight foreground games
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
