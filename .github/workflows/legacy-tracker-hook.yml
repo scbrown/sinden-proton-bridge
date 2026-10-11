@@ -27,7 +27,7 @@ jobs:
           import subprocess
           import tempfile
 
-          assert not Path('.beads/hooks/prepare-commit-msg').exists()
+          assert not os.path.lexists('.beads/hooks/prepare-commit-msg')
           original = subprocess.check_output([
               'git', 'show',
               'd188ba2177632f6f95004616b88683e1128fe366:.beads/hooks/prepare-commit-msg',
