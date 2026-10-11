@@ -27,12 +27,11 @@ jobs:
           import subprocess
           import tempfile
 
+          assert not os.path.lexists('.beads/hooks/prepare-commit-msg')
           original = subprocess.check_output([
               'git', 'show',
               'd188ba2177632f6f95004616b88683e1128fe366:.beads/hooks/prepare-commit-msg',
           ])
-          # Bootstrap preserves the existing source hook; the follow-up removes it.
-          assert Path('.beads/hooks/prepare-commit-msg').read_bytes() == original
           # Retain the real historical hook as the positive control. The tracker
           # fixture models its retired exit 3 without opening an issue store.
           with tempfile.TemporaryDirectory() as td:
