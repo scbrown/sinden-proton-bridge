@@ -1,0 +1,5 @@
+Script started on 2026-10-10 20:38:58-04:00 [COMMAND="python3 /tmp/hook-demo.py" <not executed on terminal>]
+before: commit succeeds, one retired tracker call
+after: commit succeeds, zero tracker calls, clean stderr
+
+Script done on 2026-10-10 20:38:59-04:00 [COMMAND_EXIT_CODE="0"]
