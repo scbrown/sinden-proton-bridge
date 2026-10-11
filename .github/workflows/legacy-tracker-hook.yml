@@ -1,0 +1,71 @@
+name: Legacy tracker hook retirement
+on:
+  pull_request:
+    paths:
+      - '.beads/hooks/**'
+      - '.github/workflows/legacy-tracker-hook.yml'
+  push:
+    branches: [master]
+    paths:
+      - '.beads/hooks/**'
+      - '.github/workflows/legacy-tracker-hook.yml'
+permissions:
+  contents: read
+jobs:
+  commit-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Prove commits stop invoking the retired tracker
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+          import tempfile
+
+          original = subprocess.check_output([
+              'git', 'show',
+              'd188ba2177632f6f95004616b88683e1128fe366:.beads/hooks/prepare-commit-msg',
+          ])
+          # Bootstrap preserves the existing source hook; the follow-up removes it.
+          assert Path('.beads/hooks/prepare-commit-msg').read_bytes() == original
+          # Retain the real historical hook as the positive control. The tracker
+          # fixture models its retired exit 3 without opening an issue store.
+          with tempfile.TemporaryDirectory() as td:
+              root = Path(td)
+              repo = root / 'repo'
+              hooks = root / 'hooks'
+              tools = root / 'tools'
+              calls = root / 'calls'
+              hooks.mkdir()
+              tools.mkdir()
+              tracker = tools / 'bd'
+              tracker.write_text(f'#!/bin/sh\necho called >> "{calls}"\nexit 3\n')
+              tracker.chmod(0o755)
+              env = {**os.environ, 'PATH': str(tools) + ':' + os.environ['PATH'],
+                     'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_CONFIG_SYSTEM': '/dev/null'}
+              def git(*args):
+                  return subprocess.run(['git', '-C', str(repo), *args], env=env,
+                                        capture_output=True, text=True, check=True)
+              subprocess.run(['git', 'init', '-q', str(repo)], env=env, check=True)
+              git('config', 'user.name', 'Hook probe')
+              git('config', 'user.email', 'hook-probe@example.invalid')
+              git('config', 'core.hooksPath', str(hooks))
+              hook = hooks / 'prepare-commit-msg'
+              hook.write_bytes(original)
+              hook.chmod(0o755)
+              before = git('commit', '--allow-empty', '-m', 'before retirement')
+              assert calls.read_text().splitlines() == ['called']
+              assert 'database not initialized' in before.stderr
+              hook.rename(hooks / 'prepare-commit-msg.retired')
+              calls.unlink()
+              after = git('commit', '--allow-empty', '-m', 'after retirement')
+              assert not calls.exists()
+              assert not after.stderr, after.stderr
+              print('before: commit succeeds, one retired tracker call')
+              print('after: commit succeeds, zero tracker calls, clean stderr')
+          PY
